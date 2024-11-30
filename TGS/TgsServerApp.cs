@@ -1,4 +1,5 @@
-﻿using System;
+﻿using AESEcnipter;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -8,8 +9,9 @@ public class TgsServerApp
 {
     public static void Main()
     {
-        const int port = 5001;
-        const string serviceKey = "ServiceSecretKey"; // Chave secreta para o servidor de serviços
+        const int port = 5000;
+        const string K_s = "ServiceSecretKey";
+        const string K_tgs = "TgsSecretKey1234"; 
 
         TcpListener listener = new TcpListener(IPAddress.Any, port);
         listener.Start();
@@ -31,42 +33,12 @@ public class TgsServerApp
 
             // Aqui você deve criptografar o ticket de acesso ao serviço
             string ticketService = $"Ticket para o serviço, com dados do cliente.";
-            byte[] encryptedTicketService = AesEncryptionHelper.Encrypt(ticketService, Encoding.UTF8.GetBytes(serviceKey), new byte[16]);
+            byte[] encryptedTicketService = Helper.Encrypt(ticketService, Encoding.UTF8.GetBytes(K_s), new byte[16]);
 
             // Responde ao cliente com o ticket de acesso ao serviço
             byte[] responseData = Encoding.UTF8.GetBytes(Convert.ToBase64String(encryptedTicketService));
             stream.Write(responseData, 0, responseData.Length);
         }
     }
-    public class AesEncryptionHelper
-    {
-        public static byte[] Encrypt(string text, byte[] key, byte[] iv)
-        {
-            using var aesAlg = Aes.Create();
-            aesAlg.Key = key;
-            aesAlg.IV = iv;
-            var encryptor = aesAlg.CreateEncryptor(aesAlg.Key, aesAlg.IV);
-
-            using var msEncrypt = new MemoryStream();
-            using var csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write);
-            using var swEncrypt = new StreamWriter(csEncrypt);
-            swEncrypt.Write(text);
-
-            return msEncrypt.ToArray();
-        }
-
-        public static string Decrypt(byte[] cipherText, byte[] key, byte[] iv)
-        {
-            using var aesAlg = Aes.Create();
-            aesAlg.Key = key;
-            aesAlg.IV = iv;
-            var decryptor = aesAlg.CreateDecryptor(aesAlg.Key, aesAlg.IV);
-
-            using var msDecrypt = new MemoryStream(cipherText);
-            using var csDecrypt = new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read);
-            using var srDecrypt = new StreamReader(csDecrypt);
-
-            return srDecrypt.ReadToEnd();
-        }
-    }
+   
 }

@@ -3,18 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34309.116
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client", "Client\Client.csproj", "{1781C9AC-29F0-43B1-A2CE-9D8CE53DFE5A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Client", "Client\Client.csproj", "{1781C9AC-29F0-43B1-A2CE-9D8CE53DFE5A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TGS", "TGS\TGS.csproj", "{57ACF384-9AA9-411B-B242-AC0FCD5F02E0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TGS", "TGS\TGS.csproj", "{57ACF384-9AA9-411B-B242-AC0FCD5F02E0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceServerApp", "ServiceServerApp\ServiceServerApp.csproj", "{3AD4E65A-E024-4B53-A488-A842F8ACCAB7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceServerApp", "ServiceServerApp\ServiceServerApp.csproj", "{3AD4E65A-E024-4B53-A488-A842F8ACCAB7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AS", "AS\AS.csproj", "{E65D2927-AE99-42C1-8668-A159E4A9BDC2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AS", "AS\AS.csproj", "{E65D2927-AE99-42C1-8668-A159E4A9BDC2}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{34EEBD7C-69C7-4BFF-AF8A-1C621D1EF9EF}"
-	ProjectSection(SolutionItems) = preProject
-		AesEncryptionHelper.cs = AesEncryptionHelper.cs
-	EndProjectSection
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AESEcnipter", "AESEcnipter\AESEcnipter.csproj", "{E82FD2EC-E078-4BFE-9456-563F55894140}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -38,6 +35,10 @@ Global
 		{E65D2927-AE99-42C1-8668-A159E4A9BDC2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E65D2927-AE99-42C1-8668-A159E4A9BDC2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E65D2927-AE99-42C1-8668-A159E4A9BDC2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E82FD2EC-E078-4BFE-9456-563F55894140}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E82FD2EC-E078-4BFE-9456-563F55894140}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E82FD2EC-E078-4BFE-9456-563F55894140}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E82FD2EC-E078-4BFE-9456-563F55894140}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

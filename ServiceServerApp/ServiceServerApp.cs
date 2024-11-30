@@ -6,7 +6,8 @@ public class ServiceServerApp
 {
     public static void Main()
     {
-        const int port = 54321;
+        const int port = 54320;
+        const string K_s = "ServiceSecretKey";
 
         TcpListener listener = new TcpListener(IPAddress.Any, port);
         listener.Start();
