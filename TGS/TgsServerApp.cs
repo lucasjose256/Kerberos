@@ -9,7 +9,7 @@ public class TgsServerApp
 {
     public static void Main()
     {
-        const int port = 5000;
+        const int port = 6000;
         const string K_s = "ServiceSecretKey";
         const string K_tgs = "TgsSecretKey1234"; 
 

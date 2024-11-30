@@ -9,7 +9,7 @@ public class ServiceServerApp
         const int port = 54320;
         const string K_s = "ServiceSecretKey";
 
-        TcpListener listener = new TcpListener(IPAddress.Any, port);
+        TcpListener listener = new TcpListener(IPAddress.Loopback, port);
         listener.Start();
 
         Console.WriteLine("Servidor de Serviços iniciado.");

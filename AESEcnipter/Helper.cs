@@ -5,6 +5,34 @@ namespace AESEcnipter
 {
     public class Helper
     {
+        public static byte[] EncryptWithoutIV(string plainText, byte[] key)
+        {
+            using (Aes aesAlg = Aes.Create())
+            {
+                aesAlg.Mode = CipherMode.ECB; // Modo ECB, sem IV
+                aesAlg.Key = key;
+                aesAlg.Padding = PaddingMode.PKCS7;
+
+                ICryptoTransform encryptor = aesAlg.CreateEncryptor(aesAlg.Key, null);
+                byte[] plainTextBytes = Encoding.UTF8.GetBytes(plainText);
+                return encryptor.TransformFinalBlock(plainTextBytes, 0, plainTextBytes.Length);
+            }
+        }
+
+        // Método de descriptografia sem IV usando AES ECB
+        public static string DecryptWithoutIV(byte[] cipherText, byte[] key)
+        {
+            using (Aes aesAlg = Aes.Create())
+            {
+                aesAlg.Mode = CipherMode.ECB; // Modo ECB, sem IV
+                aesAlg.Key = key;
+                aesAlg.Padding = PaddingMode.PKCS7;
+
+                ICryptoTransform decryptor = aesAlg.CreateDecryptor(aesAlg.Key, null);
+                byte[] plainTextBytes = decryptor.TransformFinalBlock(cipherText, 0, cipherText.Length);
+                return Encoding.UTF8.GetString(plainTextBytes);
+            }
+        }
         public static int GenerateRandomInt()      {
             using (var rng = RandomNumberGenerator.Create())
             {
