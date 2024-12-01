@@ -45,6 +45,7 @@ namespace AESEcnipter
             }
         }
 
+
         public static byte[] Encrypt(string text, byte[] key, byte[] iv)
         {
          

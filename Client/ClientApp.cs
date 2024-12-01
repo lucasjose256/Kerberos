@@ -8,85 +8,128 @@ using System.Threading.Tasks;
 
 public class ClientApp
 {
-    // Método assíncrono para obter o IP local
-    public static async Task<IPAddress> configIp()
+    const string asIp = "127.0.0.1";
+    const int asPort = 61000;
+    const int tgsPort = 55000;
+    const int servicePort = 54320;
+    const string clientId = "17135692347";
+    const string serviceId = "http_server";
+    const string keyASClient = "seguranca123";
+      const  int requestedTime = 60;
+     string k_c_tgs;
+    public static async Task<IPAddress> GetLocalIpAsync()
     {
         var hostName = Dns.GetHostName();
         IPHostEntry localhost = await Dns.GetHostEntryAsync(hostName);
-
-        IPAddress localIpAddress = localhost.AddressList[0]; 
+        IPAddress localIpAddress = localhost.AddressList[0];
         Console.WriteLine("Endereço IP local: " + localIpAddress);
-        
         return localIpAddress;
     }
 
-    // Método assíncrono principal
-    public static async Task Main(string[] args)
+    public static byte[] EncryptMessage(string message, byte[] key)
     {
-        const string asIp = "127.0.0.1"; 
-        const int asPort = 61000;  
-        const int tgsPort = 5000;
-        const int servicePort = 54320;
-        const string clientId = "17135692347";
-        const string serviceId = "http_server";
-        const string keyASClient = "seguranca123";
-        int requestedTime = 60;
-        int n1 = Helper.GenerateRandomInt();
-        
-        // Obtendo o IP
-        IPAddress ip = await configIp();
+        return Helper.EncryptWithoutIV(message, key);
+    }
 
-        // Convertendo chave para bytes
-        byte[] keyAsBytes = Encoding.UTF8.GetBytes(keyASClient.PadRight(16, ' '));  // Chave com 16 bytes
-        
+    public static async Task<string> SendMessageToServerAsync(string message, string serverIp, int port)
+    {
         try
         {
-            // Conectar ao servidor de autenticação (AS) e obter o ticket
-            using (TcpClient client = new TcpClient(asIp, asPort))
+            using (TcpClient client = new TcpClient(serverIp, port))
             using (NetworkStream stream = client.GetStream())
             {
-                string messageToEncrypt = $"{serviceId},{requestedTime},{n1}";
-                byte[] encryptedMessage = Helper.EncryptWithoutIV(messageToEncrypt, keyAsBytes);
-
-                string message = $"{clientId},{Convert.ToBase64String(encryptedMessage)}";
-                byte[] m1 = Encoding.UTF8.GetBytes(message);
-                await stream.WriteAsync(m1, 0, m1.Length);
-
-                byte[] buffer = new byte[256];
+                byte[] messageBytes = Encoding.UTF8.GetBytes(message);
+                await stream.WriteAsync(messageBytes, 0, messageBytes.Length);
+                byte[] buffer = new byte[512];
                 int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
-                string response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                Console.WriteLine("Ticket recebido do AS: " + response);  // Ticket recebido do AS
-
-                // Enviar o ticket para o TGS
-                using (TcpClient tgsClient = new TcpClient(asIp, tgsPort))
-                using (NetworkStream tgsStream = tgsClient.GetStream())
-                {
-                    byte[] ticketToTgs = Encoding.UTF8.GetBytes(response);
-                    await tgsStream.WriteAsync(ticketToTgs, 0, ticketToTgs.Length);
-                    Console.WriteLine("Ticket enviado ao TGS...");
-
-                    // Aguardar a resposta do TGS
-                    buffer = new byte[512];
-                    bytesRead = await tgsStream.ReadAsync(buffer, 0, buffer.Length);
-                    string tgsResponse = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                    Console.WriteLine("Ticket recebido do TGS: " + tgsResponse);  // Ticket de acesso ao serviço
-
-                    // Conectar ao servidor de serviços
-                    using (TcpClient serviceClient = new TcpClient(asIp, servicePort))
-                    using (NetworkStream serviceStream = serviceClient.GetStream())
-                    {
-                        byte[] serviceTicket = Encoding.UTF8.GetBytes(tgsResponse);
-                        await serviceStream.WriteAsync(serviceTicket, 0, serviceTicket.Length);
-                        Console.WriteLine("Ticket enviado ao Servidor de Serviços...");
-
-                        // Aguardar a resposta do servidor de serviços
-                        buffer = new byte[512];
-                        bytesRead = await serviceStream.ReadAsync(buffer, 0, buffer.Length);
-                        string serviceResponse = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                        Console.WriteLine("Resposta do Servidor de Serviços: " + serviceResponse);  // Acesso concedido ao serviço
-                    }
-                }
+                return Encoding.UTF8.GetString(buffer, 0, bytesRead);
             }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Erro ao comunicar com o servidor: " + ex.Message);
+            return string.Empty;
+        }
+    }
+
+    public static async Task<string> AuthenticateWithASAsync(string clientId, int requestedTime, int n1)
+    {
+        string messageToEncrypt = $"{serviceId},{requestedTime},{n1}";
+        byte[] encryptedMessage = EncryptMessage(messageToEncrypt, Encoding.UTF8.GetBytes(keyASClient.PadRight(16, ' ')));
+
+        string message = $"{clientId},{Convert.ToBase64String(encryptedMessage)}";
+        return await SendMessageToServerAsync(message, asIp, asPort);
+    }
+
+    public static async Task<string> GetTicketFromTGSAsync(string ticketFromAS)
+    {
+        return await SendMessageToServerAsync(ticketFromAS, asIp, tgsPort);
+    }
+
+    public static async Task<string> RequestServiceAccessAsync(string ticketFromTGS)
+    {
+        return await SendMessageToServerAsync(ticketFromTGS, asIp, servicePort);
+    }
+    public static string criarM3(string ticketAS) {
+      string[]m2=  ticketAS.Split(",", 2);
+        string part1=m2[0];
+        string t_c_tgs = m2[1];
+        byte[] keyAsBytes = Encoding.UTF8.GetBytes(keyASClient.PadRight(16, ' '));
+
+        string part1decripet = Helper.DecryptWithoutIV(Convert.FromBase64String(part1), keyAsBytes);
+        string[] message2Part1 = part1decripet.Split(",", 2);
+        string chaveSessao = message2Part1[0];
+        string numero1 = message2Part1[1];
+        Console.WriteLine("m3:chave sessao " +chaveSessao);
+        Console.WriteLine("m3:chave sessao " + numero1);
+
+        int n2 = Helper.GenerateRandomInt();
+        string messageToEncrypt = $"{clientId},{serviceId},{requestedTime},{n2}";
+        byte[] encryptedMessage = EncryptMessage(messageToEncrypt, Encoding.UTF8.GetBytes(chaveSessao.PadRight(16, ' ')));
+
+        string message = $"{Convert.ToBase64String(encryptedMessage)},{t_c_tgs}";
+        Console.WriteLine("ENVIADO AO TGS A :  " + message);
+
+        return message;
+
+    }
+    public static string criarM5(string ticketAS)
+    {
+        string[] m2 = ticketAS.Split(",", 2);
+        string part1 = m2[0];
+        string t_c_tgs = m2[1];
+        byte[] keyAsBytes = Encoding.UTF8.GetBytes(keyASClient.PadRight(16, ' '));
+
+        string part1decripet = Helper.DecryptWithoutIV(Convert.FromBase64String(part1), keyAsBytes);
+      
+        Console.WriteLine("PART1 M4 " );
+        Console.WriteLine("PART2" + part1decripet);
+       
+
+        return part1decripet;
+
+    }
+    public static async Task Main(string[] args)
+    {
+     
+        int n1 = Helper.GenerateRandomInt();
+
+        // Obtendo o IP local
+        IPAddress ip = await GetLocalIpAsync();
+
+        try
+        {
+            // Autenticar com o AS e obter o ticket
+            string ticketFromAS = await AuthenticateWithASAsync(clientId, requestedTime, n1);
+            Console.WriteLine("Ticket recebido do AS: " + ticketFromAS);
+             string m3= criarM3(ticketFromAS);
+            // Enviar o ticket para o TGS
+            string ticketFromTGS = await GetTicketFromTGSAsync(m3);
+            Console.WriteLine("Ticket recebido do TGS: " + ticketFromTGS);
+            string m5=  criarM5(ticketFromTGS);
+            // Solicitar acesso ao serviço
+            string serviceResponse = await RequestServiceAccessAsync(ticketFromTGS);
+            Console.WriteLine("Resposta do Servidor de Serviços: " + serviceResponse);
         }
         catch (Exception ex)
         {
