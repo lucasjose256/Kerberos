@@ -16,7 +16,7 @@ public class ClientApp
     const string serviceId = "http_server";
     const string keyASClient = "seguranca123";
       const  int requestedTime = 60;
-     string k_c_tgs;
+  static   string k_c_tgs="";
     public static async Task<IPAddress> GetLocalIpAsync()
     {
         var hostName = Dns.GetHostName();
@@ -78,14 +78,14 @@ public class ClientApp
 
         string part1decripet = Helper.DecryptWithoutIV(Convert.FromBase64String(part1), keyAsBytes);
         string[] message2Part1 = part1decripet.Split(",", 2);
-        string chaveSessao = message2Part1[0];
+        k_c_tgs = message2Part1[0];
         string numero1 = message2Part1[1];
-        Console.WriteLine("m3:chave sessao " +chaveSessao);
+        Console.WriteLine("m3:chave sessao " + k_c_tgs);
         Console.WriteLine("m3:chave sessao " + numero1);
 
         int n2 = Helper.GenerateRandomInt();
         string messageToEncrypt = $"{clientId},{serviceId},{requestedTime},{n2}";
-        byte[] encryptedMessage = EncryptMessage(messageToEncrypt, Encoding.UTF8.GetBytes(chaveSessao.PadRight(16, ' ')));
+        byte[] encryptedMessage = EncryptMessage(messageToEncrypt, Encoding.UTF8.GetBytes(k_c_tgs.PadRight(16, ' ')));
 
         string message = $"{Convert.ToBase64String(encryptedMessage)},{t_c_tgs}";
         Console.WriteLine("ENVIADO AO TGS A :  " + message);
@@ -97,16 +97,28 @@ public class ClientApp
     {
         string[] m2 = ticketAS.Split(",", 2);
         string part1 = m2[0];
-        string t_c_tgs = m2[1];
-        byte[] keyAsBytes = Encoding.UTF8.GetBytes(keyASClient.PadRight(16, ' '));
+        string t_c_s = m2[1];
+        byte[] keyAsBytes = Encoding.UTF8.GetBytes(k_c_tgs.PadRight(16, ' '));
 
+        //k_c_s,Tempo,N2
         string part1decripet = Helper.DecryptWithoutIV(Convert.FromBase64String(part1), keyAsBytes);
-      
-        Console.WriteLine("PART1 M4 " );
-        Console.WriteLine("PART2" + part1decripet);
-       
+        string[] part1decripetArray = part1decripet.Split(",",3);
+        string kcs = part1decripetArray[0];
+        byte[] kcsBytes= Encoding.UTF8.GetBytes(kcs.PadRight(16, ' '));
+        string tempo = part1decripetArray[1];
+        string n2 = part1decripetArray[2];
+        Console.WriteLine("ENVIANDO M5[{ID_C,T,N3}]: " + kcs);
 
-        return part1decripet;
+        int n3= Helper.GenerateRandomInt();
+        string m = $"{clientId},{tempo},{serviceId},{n3.ToString()}";
+
+        byte[] mEncripeted = Helper.EncryptWithoutIV(m,kcsBytes);
+        string mString = Convert.ToBase64String(mEncripeted);
+      
+        string combinedMessage = $"{mString},{t_c_s}";
+
+        return combinedMessage;
+      
 
     }
     public static async Task Main(string[] args)
@@ -128,7 +140,7 @@ public class ClientApp
             Console.WriteLine("Ticket recebido do TGS: " + ticketFromTGS);
             string m5=  criarM5(ticketFromTGS);
             // Solicitar acesso ao serviço
-            string serviceResponse = await RequestServiceAccessAsync(ticketFromTGS);
+            string serviceResponse = await RequestServiceAccessAsync(m5);
             Console.WriteLine("Resposta do Servidor de Serviços: " + serviceResponse);
         }
         catch (Exception ex)

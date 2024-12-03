@@ -50,21 +50,31 @@ public class TgsServerApp
             if (response[0] == ticket_info[0]) {
                 byte[] K_c_s = GenerateRandomKey(16);
                 int timeA = 45;
-               
-                string P1 = $"{K_c_s},{timeA}{ticket_info[3]}";
+                string K_c_sStrring = Convert.ToBase64String(K_c_s);
+
+                string P1 = $"{K_c_sStrring},{timeA},{ticket_info[3]}";
                 byte[] P1encript = Helper.EncryptWithoutIV(P1, Encoding.UTF8.GetBytes(response[2].PadRight(16, ' ')));
 
-                string tcs = $"{ticket_info[0]},{timeA},{K_c_s}";
+                string tcs = $"{ticket_info[0]},{timeA},{K_c_sStrring}";
                 byte[] tcsEncript = Helper.EncryptWithoutIV(tcs, Encoding.UTF8.GetBytes(K_s.PadRight(16, ' ')));
 
 
-                byte[] m4 = Encoding.UTF8.GetBytes($"{Encoding.UTF8.GetString(P1encript)},{Encoding.UTF8.GetString(tcsEncript)}"
-);
-           
-                 stream.WriteAsync(m4, 0, m4.Length);
-               
-         
-                Console.WriteLine($"ENVIADO AO cliente o ticket de acessO AO servidor{Encoding.UTF8.GetString(m4)}");
+                // Converter ambos os bytes para Base64
+                string base64EncryptedM4P1 = Convert.ToBase64String(P1encript);
+                string base64EncryptedTCS = Convert.ToBase64String(tcsEncript);
+
+                // Concatenar as duas mensagens com uma vírgula
+                string combinedMessage = $"{base64EncryptedM4P1},{base64EncryptedTCS}";
+
+             
+              byte[]  m4 = Encoding.UTF8.GetBytes(combinedMessage);
+
+                stream.WriteAsync(m4, 0, m4.Length);
+
+
+                Console.WriteLine($"ENVIADO AO cliente o ticket de acesso AO : {Convert.ToBase64String(m4)}");
+                Console.WriteLine($"ENVIADO AO cliente o ticket de acesso AO servidor p1: {Convert.ToBase64String(P1encript)}");
+                Console.WriteLine($"ENVIADO AO cliente o ticket de acesso AO servidor p2: {Convert.ToBase64String(tcsEncript)}");
 
             }
             else
