@@ -10,7 +10,7 @@ public class ClientApp
 {
     // Configurações de servidor e cliente
     const string AS_IP = "127.0.0.1";
-    const int AS_PORT = 61000;
+    const int AS_PORT = 62000;
     const int TGS_PORT = 55000;
     const int SERVICE_PORT = 54320;
     const string CLIENT_ID = "17135692347";

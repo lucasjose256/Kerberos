@@ -8,13 +8,13 @@ using AESEcnipter;
 
 public class AuthServerApp
 {
-    private const int asPort = 61000;
+    private const int asPort = 62000;
     private const string keyASClient = "seguranca123"; // Chave compartilhada com o cliente
     private const string keyTGS = "keyForTGS12345";    // Chave compartilhada com o TGS
 
     public static void Main()
     {
-        var listener = new TcpListener(IPAddress.Any, asPort);
+        var listener = new TcpListener(IPAddress.Loopback, asPort);
         listener.Start();
         Log("INFO", $"Servidor AS iniciado. Ouvindo na porta {asPort}...");
 

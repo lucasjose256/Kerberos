@@ -13,7 +13,7 @@ public class TgsServerApp
         const string K_s = "ServiceSecretKey";   // Chave compartilhada com o servidor final
         const string K_tgs = "keyForTGS12345";   // Chave compartilhada com o TGS
 
-        TcpListener listener = new TcpListener(IPAddress.Any, port);
+        TcpListener listener = new TcpListener(IPAddress.Loopback, port);
         listener.Start();
 
         Console.WriteLine("Servidor TGS iniciado na porta " + port);
