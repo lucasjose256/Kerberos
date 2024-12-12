@@ -1,101 +1,117 @@
 ﻿using System.Net.Sockets;
 using System.Net;
 using System.Text;
-using AESEcnipter;
+using AESEcnipter; // Biblioteca de criptografia fictícia
+using System.Threading;
 
 public class ServiceServerApp
 {
     const int port = 54320;
-    const string K_s = "ServiceSecretKey";
+    const string K_s = "ServiceSecretKey"; // Chave secreta compartilhada com o cliente
+
     public static void Main()
     {
-        
-
         TcpListener listener = new TcpListener(IPAddress.Loopback, port);
         listener.Start();
 
-        Console.WriteLine("Servidor de Serviços iniciado.");
+        Console.WriteLine("Servidor iniciado na porta " + port);
 
         while (true)
         {
             using TcpClient client = listener.AcceptTcpClient();
             using NetworkStream stream = client.GetStream();
 
-            // Aqui você processaria o ticket do cliente e validaria antes de fornecer o serviço
-            byte[] buffer = new byte[256];
-            int bytesRead = stream.Read(buffer, 0, buffer.Length);
-            string ticket = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-            Console.WriteLine("Ticket recebido: " + ticket);
-            createM6(ticket);
-            // Após validar o ticket, forneça o serviço ao cliente
-            string response = "Acesso concedido ao serviço!";
-            byte[] responseData = Encoding.UTF8.GetBytes(response);
-            stream.Write(responseData, 0, responseData.Length);
+            try
+            {
+                // Receber o ticket do cliente
+                byte[] buffer = new byte[256];
+                int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                string ticket = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                Console.WriteLine("Ticket recebido: " + ticket);
+
+                // Validar o ticket
+                if (!ValidateTicket(ticket, out int tempoLimite))
+                {
+                    string mensagemErro = "Permissão negada: Ticket inválido.";
+                    SendResponse(stream, mensagemErro);
+                    Console.WriteLine(mensagemErro);
+                    continue; // Passar para a próxima conexão
+                }
+
+                // Permitir conexão
+                string permissao = $"Permissão concedida. Tempo limite: {tempoLimite} segundos.";
+                SendResponse(stream, permissao);
+                Console.WriteLine(permissao);
+
+                DateTime inicio = DateTime.Now;
+
+                // Loop para receber mensagens dentro do tempo permitido
+                while ((DateTime.Now - inicio).TotalSeconds < tempoLimite)
+                {
+                    if (stream.DataAvailable)
+                    {
+                        buffer = new byte[1024]; // Buffer maior para mensagens
+                        bytesRead = stream.Read(buffer, 0, buffer.Length);
+                        if (bytesRead == 0) break; // Cliente desconectou
+
+                        string mensagem = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                        Console.WriteLine("Mensagem recebida do cliente: " + mensagem);
+
+                        // Responder ao cliente
+                        string resposta = $"Servidor recebeu: {mensagem}";
+                        SendResponse(stream, resposta);
+                    }
+
+                    // Pequena pausa para reduzir uso excessivo de CPU
+                    Thread.Sleep(100);
+                }
+
+                Console.WriteLine("Tempo expirado. Encerrando conexão.");
+                SendResponse(stream, "Tempo expirado. Conexão encerrada.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro: {ex.Message}");
+                SendResponse(stream, "Erro no servidor. Conexão encerrada.");
+            }
         }
     }
 
-
-    static void createM6(string ticket)
+    // Valida o ticket e retorna o tempo limite (em segundos)
+    static bool ValidateTicket(string ticket, out int tempoLimite)
     {
-        // Separar o ticket em duas partes
-        string[] ticketArray = ticket.Split(",", 2);
-        if (ticketArray.Length != 2)
-        {
-            throw new ArgumentException("Ticket inválido. Certifique-se de que está no formato correto.");
-        }
-
-        // Partes do ticket
-        string part1 = ticketArray[0]; // Encriptado com Kcs
-        string part2 = ticketArray[1]; // Encriptado com Ks
-
-        // Decodificar e preparar chave Ks
-        byte[] ksAsBytes = Encoding.UTF8.GetBytes(K_s.PadRight(16, ' ')); // Ajustar tamanho da chave para 16 bytes
-        byte[] encryptedPart2;
-
+        tempoLimite = 0;
         try
         {
-            encryptedPart2 = Convert.FromBase64String(part2); // Decodificar part2 de base64
+            string[] ticketArray = ticket.Split(",", 2);
+            if (ticketArray.Length != 2)
+                return false;
+
+            string part1 = ticketArray[0];
+            string part2 = ticketArray[1];
+
+            // Descriptografar part2 usando K_s
+            byte[] ksAsBytes = Encoding.UTF8.GetBytes(K_s.PadRight(16, ' '));
+            byte[] encryptedPart2 = Convert.FromBase64String(part2);
+            string part2Decrypted = Helper.DecryptWithoutIV(encryptedPart2, ksAsBytes);
+
+            string[] part2Array = part2Decrypted.Split(",", 3);
+            if (part2Array.Length != 3 || !int.TryParse(part2Array[1], out tempoLimite) || tempoLimite <= 0)
+                return false;
+
+            Console.WriteLine("Ticket validado com sucesso.");
+            return true;
         }
-        catch (FormatException)
+        catch
         {
-            throw new ArgumentException("Part2 não está no formato base64 esperado.");
+            return false; // Retorna falso em caso de falha
         }
-
-        // Descriptografar part2 com Ks
-        string part2Decrypted = Helper.DecryptWithoutIV(encryptedPart2, ksAsBytes);
-
-        // Separar os campos de part2
-        string[] part2Array = part2Decrypted.Split(",", 3);
-        if (part2Array.Length != 3)
-        {
-            throw new ArgumentException("Part2 descriptografado está mal formatado.");
-        }
-
-        string id = part2Array[0];
-        string tempoA = part2Array[1];
-        string kcs = part2Array[2];
-
-        // Preparar chave Kcs
-        byte[] kcsAsBytes = Encoding.UTF8.GetBytes(kcs.PadRight(16, ' ')); // Ajustar tamanho da chave
-
-        // Decodificar part1 de base64 antes de descriptografar
-        byte[] encryptedPart1;
-        try
-        {
-            encryptedPart1 = Convert.FromBase64String(part1);
-        }
-        catch (FormatException)
-        {
-            throw new ArgumentException("Part1 não está no formato base64 esperado.");
-        }
-
-        // Descriptografar part1 com Kcs
-        string part1Decrypted = Helper.DecryptWithoutIV(encryptedPart1, kcsAsBytes);
-
-        // Exibir os resultados
-        Console.WriteLine("Ticket Decriptado (Part2): " + part2Decrypted);
-        Console.WriteLine("Ticket Decriptado (Part1): " + part1Decrypted);
     }
 
-
+    // Envia mensagens para o cliente
+    static void SendResponse(NetworkStream stream, string mensagem)
+    {
+        byte[] responseData = Encoding.UTF8.GetBytes(mensagem);
+        stream.Write(responseData, 0, responseData.Length);
+    }
 }

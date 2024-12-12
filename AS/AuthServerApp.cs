@@ -14,136 +14,128 @@ public class AuthServerApp
 
     public static void Main()
     {
-        // Criar o servidor para escutar na porta 61000
         var listener = new TcpListener(IPAddress.Any, asPort);
         listener.Start();
-        Console.WriteLine("Servidor AS ouvindo na porta " + asPort);
+        Log("INFO", $"Servidor AS iniciado. Ouvindo na porta {asPort}...");
 
-        // Aguardar uma conexão do cliente
-        using TcpClient client = listener.AcceptTcpClient();
-        using NetworkStream stream = client.GetStream();
+        while (true)
+        {
+            try
+            {
+                using TcpClient client = listener.AcceptTcpClient();
+                Log("INFO", "Conexão aceita de " + client.Client.RemoteEndPoint);
 
-        // Processar a conexão do cliente
-        ProcessClientConnection(stream);
+                using NetworkStream stream = client.GetStream();
+                ProcessClient(stream);
+            }
+            catch (Exception ex)
+            {
+                Log("ERROR", "Erro no servidor: " + ex.Message);
+            }
+        }
     }
 
-    private static void ProcessClientConnection(NetworkStream stream)
+    private static void ProcessClient(NetworkStream stream)
     {
         try
         {
-            // Receber a mensagem M1 do cliente
             string m1 = ReceiveMessage(stream);
-            Console.WriteLine("Mensagem M1 recebida: " + m1);
+            Log("DEBUG", $"M1 recebido: {m1}");
 
-            // Processar a mensagem M1
             if (TryProcessM1(m1, out byte[] m2, out string errorMessage))
             {
-                // Enviar M2 de volta ao cliente
-                stream.Write(m2, 0, m2.Length);
-                Console.WriteLine("M2 enviado ao cliente.");
+                SendMessage(stream, m2);
+                Log("INFO", "M2 enviado com sucesso.");
             }
             else
             {
-                Console.WriteLine(errorMessage);
-                SendMessage(stream, errorMessage);
+                SendMessage(stream, Encoding.UTF8.GetBytes(errorMessage));
+                Log("ERROR", "Falha ao processar M1: " + errorMessage);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Erro durante o processo de autenticação: " + ex.Message);
-            SendMessage(stream, "Erro no servidor.");
+            Log("ERROR", "Erro ao processar cliente: " + ex.Message);
+            SendMessage(stream, Encoding.UTF8.GetBytes("Erro interno no servidor."));
         }
     }
 
     private static string ReceiveMessage(NetworkStream stream)
     {
-        byte[] buffer = new byte[256];
+        byte[] buffer = new byte[512];
         int bytesRead = stream.Read(buffer, 0, buffer.Length);
-        return Encoding.UTF8.GetString(buffer, 0, bytesRead);
+        string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+        return message;
     }
 
-    private static void SendMessage(NetworkStream stream, string message)
+    private static void SendMessage(NetworkStream stream, byte[] messageBytes)
     {
-        byte[] messageBytes = Encoding.UTF8.GetBytes(message);
         stream.Write(messageBytes, 0, messageBytes.Length);
-    }
-
-    private static bool IsValidClientId(string clientId)
-    {
-        // Verifique o clientId em um banco de dados ou outra fonte
-        // Aqui é apenas um exemplo simples
-        return clientId == "17135692347";
     }
 
     private static bool TryProcessM1(string m1, out byte[] m2, out string errorMessage)
     {
         m2 = null;
-        errorMessage = string.Empty;
+        errorMessage = "";
 
-        // Separar o clientId e a mensagem criptografada
         string[] parts = m1.Split(',', 2);
         if (parts.Length < 2)
         {
-            errorMessage = "Mensagem M1 inválida.";
+            errorMessage = "Formato inválido para M1.";
             return false;
         }
 
         string clientId = parts[0];
+        string encryptedDataBase64 = parts[1];
+
         if (!IsValidClientId(clientId))
         {
-            errorMessage = "Usuário sem permissão de acesso.";
+            errorMessage = "Cliente não autorizado.";
             return false;
         }
 
-        string encryptedMessageBase64 = parts[1];
-        byte[] encryptedMessage = Convert.FromBase64String(encryptedMessageBase64);
+        byte[] encryptedData = Convert.FromBase64String(encryptedDataBase64);
+        byte[] keyASBytes = Encoding.UTF8.GetBytes(keyASClient.PadRight(16, ' '));
 
-        // Gerar a chave de 16 bytes a partir da chave compartilhada (keyASClient)
-        byte[] keyAsBytes = Encoding.UTF8.GetBytes(keyASClient.PadRight(16, ' '));
-
-        // Descriptografar a mensagem
-        string decryptedMessage = Helper.DecryptWithoutIV(encryptedMessage, keyAsBytes);
-        Console.WriteLine("Mensagem descriptografada: " + decryptedMessage);
-
-        // Dividir a mensagem para obter os componentes
-        string[] messageParts = decryptedMessage.Split(',');
-        if (messageParts.Length < 3)
+        string decryptedMessage;
+        try
         {
-            errorMessage = "Mensagem descriptografada inválida.";
-            return false;
+            decryptedMessage = Helper.DecryptWithoutIV(encryptedData, keyASBytes);
         }
-
-        string serviceId = messageParts[0];
-        if (!int.TryParse(messageParts[1], out int requestedTime) ||
-            !int.TryParse(messageParts[2], out int n1))
+        catch
         {
-            errorMessage = "Formato inválido dos dados na mensagem descriptografada.";
+            errorMessage = "Falha ao descriptografar a mensagem M1.";
             return false;
         }
 
-        Console.WriteLine($"ID_S: {serviceId}, T_R: {requestedTime}, N1: {n1}");
+        Log("DEBUG", $"M1 descriptografado: {decryptedMessage}");
+        string[] dataParts = decryptedMessage.Split(',');
 
-        // Gerar K_c_tgs (Chave de sessão entre cliente e TGS)
+        if (dataParts.Length < 3 || !int.TryParse(dataParts[1], out int requestedTime) || !int.TryParse(dataParts[2], out int n1))
+        {
+            errorMessage = "Dados inválidos em M1 descriptografado.";
+            return false;
+        }
+
         byte[] keyCtoTGS = GenerateRandomKey(16);
 
         string m2Payload = $"{Convert.ToBase64String(keyCtoTGS)},{n1}";
-        // Criptografar o m2Payload com a chave keyASClient
-        byte[] encryptedM2Payload = Helper.EncryptWithoutIV(m2Payload, Encoding.UTF8.GetBytes(keyASClient.PadRight(16, ' ')));
+        byte[] encryptedM2Payload = Helper.EncryptWithoutIV(m2Payload, keyASBytes);
 
-        // Criar o ticket TGS
         string ticketTGS = $"{clientId},{requestedTime},{Convert.ToBase64String(keyCtoTGS)}";
-        // Criptografar o ticket TGS com a chave keyTGS
         byte[] encryptedTicketTGS = Helper.EncryptWithoutIV(ticketTGS, Encoding.UTF8.GetBytes(keyTGS.PadRight(16, ' ')));
 
-        // Converter ambos os bytes para Base64
-        string base64EncryptedM2Payload = Convert.ToBase64String(encryptedM2Payload);
-        string base64EncryptedTicketTGS = Convert.ToBase64String(encryptedTicketTGS);
+    
+        string combinedMessage = $"{Convert.ToBase64String(encryptedM2Payload)},{Convert.ToBase64String(encryptedTicketTGS)}";
+        m2 = Encoding.UTF8.GetBytes(combinedMessage);
 
-        // Concatenar as duas mensagens com uma vírgula
-        string combinedMessage = $"{base64EncryptedM2Payload},{base64EncryptedTicketTGS}";
-
-        m2 = Encoding.UTF8.GetBytes( combinedMessage);
+        Log("INFO", "M2 gerado e pronto para envio.");
         return true;
+    }
+
+    private static bool IsValidClientId(string clientId)
+    {
+        return clientId == "17135692347";
     }
 
     private static byte[] GenerateRandomKey(int size)
@@ -153,6 +145,9 @@ public class AuthServerApp
         rng.GetBytes(key);
         return key;
     }
+
+    private static void Log(string level, string message)
+    {
+        Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{level}] {message}");
+    }
 }
-
-
